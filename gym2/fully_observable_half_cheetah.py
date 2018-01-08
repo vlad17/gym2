@@ -16,6 +16,7 @@ import numpy as np
 import tensorflow as tf
 
 from .fully_observable import FullyObservable
+from .mujoco_env import MujocoEnv
 
 
 class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
@@ -27,7 +28,7 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #     utils.EzPickle.__init__(self)
 
     def __init__(self):
-        super().__init__(self, 'half_cheetah.xml', 5)
+        super().__init__('half_cheetah.xml', 5)
 
     # gym code
     # def _step(self, action):
@@ -82,8 +83,8 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     def _get_obs(self):
         return np.concatenate([
             # difference from gym: need qpos x value for reward
-            self.model.data.qpos.flat,
-            self.model.data.qvel.flat,
+            self.sim.data.qpos.flat,
+            self.sim.data.qvel.flat,
         ])
 
     # gym code

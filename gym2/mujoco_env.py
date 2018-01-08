@@ -69,6 +69,14 @@ class MujocoEnv(gym.Env):
         """
         raise NotImplementedError
 
+    def viewer_setup(self):
+        """
+        This method is called when the viewer is initialized and after every reset
+        Optionally implement this method, if you need to tinker with camera position
+        and so forth.
+        """
+        pass
+
     # -----------------------------
 
     def _reset(self):
@@ -99,22 +107,26 @@ class MujocoEnv(gym.Env):
     def _render(self, mode='human', close=False):
         if close:
             if self.viewer is not None:
-                self._get_viewer()
                 self.viewer = None
             return
 
         if mode == 'rgb_array':
-            self._get_viewer().render()
-            data, width, height = self._get_viewer().get_image()
-            return np.fromstring(data, dtype='uint8').reshape(height, width, 3)[::-1, :, :]
+            width, height = 640, 480
+            self._setup_render()
+            data = self.sim.render(width, height)
+            return data.reshape(height, width, 3)[::-1, :, :]
         elif mode == 'human':
-            self._get_viewer().render()
+            # avoid literally all GL pain by using off-screen renders
+            pass
 
-    def _get_viewer(self):
-        if self.viewer is None:
-            self.viewer = mujoco_py.MjViewer(self.sim)
-            self.viewer_setup()
-        return self.viewer
+    def _setup_render(self):
+        if self.sim._render_context_offscreen is None:
+            self.sim.render(640, 480)
+            assert self.sim._render_context_offscreen is not None
+            ctx = self.sim._render_context_offscreen
+            ctx.cam.distance = self.model.stat.extent * 0.5
+            ctx.cam.type = mujoco_py.generated.const.CAMERA_TRACKING
+            ctx.cam.trackbodyid = 0
 
     def get_body_com(self, body_name):
         return self.data.get_body_xpos(body_name)

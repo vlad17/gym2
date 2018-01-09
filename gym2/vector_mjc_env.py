@@ -37,8 +37,10 @@ class VectorMJCEnv(VectorEnv):
         self.observation_space = env.observation_space
         self.reward_range = env.reward_range
         self.n = len(self._envs)
-        self._mask = np.ones(self.n, dtype=bool)
         self._seed_uncorr(self.n)
+
+        for env in self._envs:
+            env.sim.data.ctrl[:] = 0
 
     def set_state_from_ob(self, obs):
         for ob, env in zip(obs, self._envs):
@@ -51,11 +53,9 @@ class VectorMJCEnv(VectorEnv):
         return seeds
 
     def _reset(self):
-        self._mask[:] = True
         return np.asarray([env.reset() for env in self._envs])
 
     def _step(self, action):
-        # TODO add mask / m handling (masking just to prevent errors)
         m = len(action)
         assert m <= len(self._envs), (m, len(self._envs))
         obs = np.empty((m,) + self.observation_space.shape)

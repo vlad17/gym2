@@ -29,16 +29,15 @@ class VectorEnv(gym.Env):
     fully observable MDP).
 
     Since some environments may terminate early while others are
-    iterating, vectorized environments automatically mask out done
-    environments from taking further actions until the next reset().
-    The caller is still responsible for tracking which environment
+    iterating, the caller is still responsible for tracking which environment
     indices are active, since there is no guarantee on the returned
-    values for masked environments.
+    values for environments that are done but are still stepped.
 
     Moreover, vectorized environments handle being passed in arguments
     with smaller rank gracefully. E.g., if a vectorized environment has
     rank n (n simultaneous vectorized environments), it will accept
-    actions of length m <= n and only simulate the first m environments.
+    actions of length m <= n and only return the corresponding
+    actions for the first m environments.
     """
 
     def set_state_from_ob(self, obs):

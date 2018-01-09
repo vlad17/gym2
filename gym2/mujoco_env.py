@@ -41,15 +41,14 @@ class MujocoEnv(gym.Env):
 
         self.init_qpos = self.sim.data.qpos.ravel().copy()
         self.init_qvel = self.sim.data.qvel.ravel().copy()
-        observation, _, _, _ = self._step(np.zeros(self.model.nu))
-        self.obs_dim = observation.size
+        self.obs_shape = self._obs_shape()
 
         bounds = self.model.actuator_ctrlrange.copy()
         low = bounds[:, 0]
         high = bounds[:, 1]
         self.action_space = spaces.Box(low, high)
 
-        high = np.inf * np.ones(self.obs_dim)
+        high = np.inf * np.ones(self.obs_shape)
         low = -high
         self.observation_space = spaces.Box(low, high)
 
@@ -69,14 +68,18 @@ class MujocoEnv(gym.Env):
         """
         raise NotImplementedError
 
-    def get_obs(self, out_obs=None):
+    def _obs_shape(self):
+        """
+        The shape of the observation array (for computing
+        self.observation_space). The MJC model will have been loaded
+        by the time this is called.
+        """
+        raise NotImplementedError
+
+    def get_obs(self, out_obs):
         """
         Provide an observation in the observation space given the current data,
         available in self.sim, writing into the given output array.
-
-        If the output array is None, create a new array of an appropriate size.
-
-        In both cases return the destination array.
         """
         raise NotImplementedError
 
@@ -113,7 +116,8 @@ class MujocoEnv(gym.Env):
     def _step(self, ctrl):
         self.sim.data.ctrl[:] = ctrl
         self.sim.step()
-        obs = self.get_obs()
+        obs = np.empty(self.obs_shape)
+        self.get_obs(obs)
         reward = self.sim.data.userdata[0]
         done = self.sim.data.userdata[1] > 0
         info = {}

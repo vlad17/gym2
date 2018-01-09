@@ -86,7 +86,7 @@ def _bench(envname):
         if is_gym2_bool:
             from gym2.vector_mjc_env import VectorMJCEnv
 
-            for par in [2, 4, 8, 16, 32, 64, 128, 256, 512]:
+            for par in [64]:  # [2, 4, 8, 16, 32, 64, 128, 256, 512]:
                 with closing(VectorMJCEnv(par, envclass)) as venv:
                     start = time.time()
                     for ac in acs.reshape(-1, par, *acs.shape[1:]):

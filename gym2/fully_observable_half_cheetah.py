@@ -76,24 +76,13 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #     return ob, reward, done, dict(reward_run=reward_run,
     #         reward_ctrl=reward_ctrl)
 
-    def _incremental_reward(self, state, action, next_state, reward, sumaxis1):
-        ac_reg = sumaxis1(action * action)
+    def tf_reward(self, state, action, next_state):
+        reward = tf.zeros([tf.shape(state)[0]])
+        ac_reg = tf.reduce_sum(action * action, axis=1)
         ac_reg *= 0.1
         reward -= ac_reg
         reward += (next_state[:, 0] - state[:, 0]) / self.unwrapped.dt
         return reward
-
-    def np_reward(self, state, action, next_state):
-        reward = 0
-        reward = self._incremental_reward(state, action, next_state, reward,
-                                          lambda x: np.sum(x, axis=1))
-        return reward
-
-    def tf_reward(self, state, action, next_state):
-        curr_reward = tf.zeros([tf.shape(state)[0]])
-        return self._incremental_reward(
-            state, action, next_state, curr_reward,
-            lambda x: tf.reduce_sum(x, axis=1))
 
     # gym code
     # def _get_obs(self):
@@ -102,13 +91,10 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #         self.model.data.qvel.flat,
     #     ])
 
-    def get_obs(self, out_obs=None):
+    def get_obs(self, out_obs):
         pos_size = self.sim.data.qpos.size
-        if out_obs is None:
-            vel_size = self.sim.data.qpos.size
-            out_obs = np.empty(vel_size + pos_size)
-        out_obs[:pos_size] = self.sim.data.qpos.ravel()
-        out_obs[pos_size:] = self.sim.data.qpos.ravel()
+        out_obs[:pos_size] = self.sim.data.qpos
+        out_obs[pos_size:] = self.sim.data.qvel
         return out_obs
 
     # gym code
@@ -124,7 +110,9 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
             self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
         qvel = self.init_qvel + self.np_random.randn(self.model.nv) * .1
         self.set_state(qpos, qvel)
-        return self.get_obs()
+        obs = np.empty(self._obs_shape())
+        self.get_obs(obs)
+        return obs
 
     def set_state_from_ob(self, ob):
         self.reset()
@@ -132,3 +120,8 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
         qpos = ob[:split].reshape(self.init_qpos.shape)
         qvel = ob[split:].reshape(self.init_qvel.shape)
         self.set_state(qpos, qvel)
+
+    def _obs_shape(self):
+        pos_size = self.sim.data.qpos.size
+        vel_size = self.sim.data.qpos.size
+        return (pos_size + vel_size,)

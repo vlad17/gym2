@@ -1,2 +1,3 @@
 from .fully_observable_ant import FullyObservableAnt
 from .fully_observable_half_cheetah import FullyObservableHalfCheetah
+from .vector_mjc_env import VectorMJCEnv

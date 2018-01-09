@@ -91,7 +91,13 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #         self.model.data.qvel.flat,
     #     ])
 
+    def _obs_shape(self):
+        pos_size = self.sim.data.qpos.size
+        vel_size = self.sim.data.qvel.size
+        return (pos_size + vel_size,)
+
     def get_obs(self, out_obs):
+        # difference from gym: added x position to observations
         pos_size = self.sim.data.qpos.size
         out_obs[:pos_size] = self.sim.data.qpos
         out_obs[pos_size:] = self.sim.data.qvel
@@ -120,8 +126,3 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
         qpos = ob[:split].reshape(self.init_qpos.shape)
         qvel = ob[split:].reshape(self.init_qvel.shape)
         self.set_state(qpos, qvel)
-
-    def _obs_shape(self):
-        pos_size = self.sim.data.qpos.size
-        vel_size = self.sim.data.qpos.size
-        return (pos_size + vel_size,)

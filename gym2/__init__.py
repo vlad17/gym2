@@ -1,1 +1,2 @@
+from .fully_observable_ant import FullyObservableAnt
 from .fully_observable_half_cheetah import FullyObservableHalfCheetah

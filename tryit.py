@@ -21,14 +21,16 @@ def _mjpv():
 def _env(envname):
     if _mjpv() == '0.5.7':
         envs = {
-            'hc': lambda: gym.make('HalfCheetah-v1')
+            'hc': lambda: gym.make('HalfCheetah-v1'),
+            'ant': lambda: gym.make('Ant-v1')
         }
     else:
         msg = 'you should be using vlad17/mujoco_py branch pre-post-callbacks'
         assert _mjpv() == '1.50.1.99999', msg
-        from gym2 import FullyObservableHalfCheetah
+        import gym2
         envs = {
-            'hc': FullyObservableHalfCheetah
+            'hc': gym2.FullyObservableHalfCheetah,
+            'ant': gym2.FullyObservableAnt
         }
     if envname not in envs:
         _usage()
@@ -86,7 +88,7 @@ def _bench(envname):
         if is_gym2_bool:
             from gym2.vector_mjc_env import VectorMJCEnv
 
-            for par in [64]:  # [2, 4, 8, 16, 32, 64, 128, 256, 512]:
+            for par in [2, 4, 8, 16, 32, 64, 128, 256, 512]:
                 with closing(VectorMJCEnv(par, envclass)) as venv:
                     start = time.time()
                     for ac in acs.reshape(-1, par, *acs.shape[1:]):

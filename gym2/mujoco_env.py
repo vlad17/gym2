@@ -31,7 +31,6 @@ class MujocoEnv(gym.Env):
         self.model = mujoco_py.load_model_from_path(fullpath)
         self.sim = mujoco_py.MjSim(
             self.model, nsubsteps=self.frame_skip, **mjsim_kwargs)
-        self.data = self.sim.data
         self.viewer = None
 
         self.metadata = {

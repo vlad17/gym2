@@ -12,11 +12,42 @@ This file contains a fully-observable analogue of the HalfCheetah gym
 environment.
 """
 
+from string import Template
+
 import numpy as np
 import tensorflow as tf
+from mujoco_py.builder import build_callback_fn
 
 from .fully_observable import FullyObservable
 from .mujoco_env import MujocoEnv
+
+_FRAMESKIP = 5
+
+# before taking any steps, store the initial x position
+_PRESTEP = """
+void fun(const mjModel* m, mjData* d) {
+  d->userdata[0] = d->qpos[0];
+}
+"""
+
+# after taking all the steps, store the resulting reward in userdata[0]
+# and whether we're done in userdata[1]
+_POSTSTEP = Template("""
+void fun(const mjModel* m, mjData* d) {
+  double x_before = d->userdata[0];
+  double x_after = d->qpos[0];
+  double control_magnitude = 0;
+  double dt = m->opt.timestep * $FRAMESKIP;
+  for (int i = 0; i < m->nu; ++i) {
+    control_magnitude += d->ctrl[i] * d->ctrl[i];
+  }
+  d->userdata[0] = (x_after - x_before) / dt - 0.1 * control_magnitude;
+  d->userdata[1] = 0;
+}
+""").substitute(FRAMESKIP=_FRAMESKIP)
+
+_PRESTEP_CALLBACK_FN = build_callback_fn(_PRESTEP)
+_POSTSTEP_CALLBACK_FN = build_callback_fn(_POSTSTEP)
 
 
 class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
@@ -28,7 +59,9 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #     utils.EzPickle.__init__(self)
 
     def __init__(self):
-        super().__init__('half_cheetah.xml', 5)
+        super().__init__('half_cheetah.xml', _FRAMESKIP,
+                         prestep_callback_ptr=_PRESTEP_CALLBACK_FN,
+                         poststep_callback_ptr=_POSTSTEP_CALLBACK_FN)
 
     # gym code
     # def _step(self, action):
@@ -62,17 +95,6 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
             state, action, next_state, curr_reward,
             lambda x: tf.reduce_sum(x, axis=1))
 
-    def _step(self, action):
-        state_before = self._get_obs()
-        self.do_simulation(action, self.frame_skip)
-        state_after = self._get_obs()
-        reward = self.np_reward(
-            state_before[np.newaxis, ...],
-            action[np.newaxis, ...],
-            state_after[np.newaxis, ...])
-        done = False
-        return state_after, reward, done, {}
-
     # gym code
     # def _get_obs(self):
     #     return np.concatenate([
@@ -81,11 +103,11 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #     ])
 
     def _get_obs(self):
-        return np.concatenate([
-            # difference from gym: need qpos x value for reward
-            self.sim.data.qpos.flat,
-            self.sim.data.qvel.flat,
-        ])
+        pos_size, vel_size = self.sim.data.qpos.size, self.sim.data.qvel.size,
+        obs = np.empty((pos_size + vel_size,))
+        obs[:pos_size] = self.sim.data.qpos.ravel()
+        obs[pos_size:] = self.sim.data.qpos.ravel()
+        return obs
 
     # gym code
     # def reset_model(self):

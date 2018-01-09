@@ -1,6 +1,6 @@
 """
 MuJoCo 1.50 compatible MujocoEnv.
-Adopted from https://github.com/openai/gym/pull/767.
+Adapted from https://github.com/openai/gym/pull/767.
 """
 
 import os
@@ -19,7 +19,7 @@ class MujocoEnv(gym.Env):
     Superclass for all MuJoCo environments.
     """
 
-    def __init__(self, model_path, frame_skip):
+    def __init__(self, model_path, frame_skip, **mjsim_kwargs):
         if model_path.startswith("/"):
             fullpath = model_path
         else:
@@ -29,7 +29,8 @@ class MujocoEnv(gym.Env):
             raise IOError("File %s does not exist" % fullpath)
         self.frame_skip = frame_skip
         self.model = mujoco_py.load_model_from_path(fullpath)
-        self.sim = mujoco_py.MjSim(self.model)
+        self.sim = mujoco_py.MjSim(
+            self.model, nsubsteps=self.frame_skip, **mjsim_kwargs)
         self.data = self.sim.data
         self.viewer = None
 
@@ -40,7 +41,7 @@ class MujocoEnv(gym.Env):
 
         self.init_qpos = self.sim.data.qpos.ravel().copy()
         self.init_qvel = self.sim.data.qvel.ravel().copy()
-        observation, _reward, done, _info = self._step(np.zeros(self.model.nu))
+        observation, _, done, _ = self._step(np.zeros(self.model.nu))
         assert not done
         self.obs_dim = observation.size
 
@@ -66,6 +67,13 @@ class MujocoEnv(gym.Env):
         """
         Reset the robot degrees of freedom (qpos and qvel).
         Implement this in each subclass.
+        """
+        raise NotImplementedError
+
+    def _get_obs(self):
+        """
+        Provide an observation in the observation space given the current data,
+        available in self.sim.
         """
         raise NotImplementedError
 
@@ -99,10 +107,14 @@ class MujocoEnv(gym.Env):
     def dt(self):
         return self.model.opt.timestep * self.frame_skip
 
-    def do_simulation(self, ctrl, n_frames):
+    def _step(self, ctrl):
         self.sim.data.ctrl[:] = ctrl
-        for _ in range(n_frames):
-            self.sim.step()
+        self.sim.step()
+        obs = self._get_obs()
+        reward = self.sim.data.userdata[0]
+        done = self.sim.data.userdata[1] > 0
+        info = {}
+        return obs, reward, done, info
 
     def _render(self, mode='human', close=False):
         if close:
@@ -127,12 +139,3 @@ class MujocoEnv(gym.Env):
             ctx.cam.distance = self.model.stat.extent * 0.5
             ctx.cam.type = mujoco_py.generated.const.CAMERA_TRACKING
             ctx.cam.trackbodyid = 0
-
-    def get_body_com(self, body_name):
-        return self.data.get_body_xpos(body_name)
-
-    def state_vector(self):
-        return np.concatenate([
-            self.sim.data.qpos.flat,
-            self.sim.data.qvel.flat
-        ])

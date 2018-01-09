@@ -24,6 +24,8 @@ def _env(envname):
             'hc': lambda: gym.make('HalfCheetah-v1')
         }
     else:
+        msg = 'you should be using vlad17/mujoco_py branch pre-post-callbacks'
+        assert _mjpv() == '1.50.1.99999', msg
         from gym2 import FullyObservableHalfCheetah
         envs = {
             'hc': FullyObservableHalfCheetah

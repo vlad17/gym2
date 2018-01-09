@@ -102,12 +102,14 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
     #         self.model.data.qvel.flat,
     #     ])
 
-    def _get_obs(self):
-        pos_size, vel_size = self.sim.data.qpos.size, self.sim.data.qvel.size,
-        obs = np.empty((pos_size + vel_size,))
-        obs[:pos_size] = self.sim.data.qpos.ravel()
-        obs[pos_size:] = self.sim.data.qpos.ravel()
-        return obs
+    def get_obs(self, out_obs=None):
+        pos_size = self.sim.data.qpos.size
+        if out_obs is None:
+            vel_size = self.sim.data.qpos.size
+            out_obs = np.empty(vel_size + pos_size)
+        out_obs[:pos_size] = self.sim.data.qpos.ravel()
+        out_obs[pos_size:] = self.sim.data.qpos.ravel()
+        return out_obs
 
     # gym code
     # def reset_model(self):
@@ -122,7 +124,7 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
             self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
         qvel = self.init_qvel + self.np_random.randn(self.model.nv) * .1
         self.set_state(qpos, qvel)
-        return self._get_obs()
+        return self.get_obs()
 
     def set_state_from_ob(self, ob):
         self.reset()

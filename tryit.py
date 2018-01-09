@@ -70,17 +70,32 @@ def _render(envname):
 
 
 def _bench(envname):
-    is_gym2()
     envclass = _env(envname)
     with closing(envclass()) as env:
         env.reset()
         start = time.time()
-        for ac in _random_actions(env, 50000):
+        acs = _random_actions(env, 2 ** 16)
+        for ac in acs:
             _, _, done, _ = env.step(ac)
             if done:
                 env.reset()
         end = time.time()
-        print('runtime for 50K steps {:.4g}'.format(end - start))
+
+        is_gym2_bool = is_gym2()
+        print('runtime for ~65K steps {:.4g}'.format(end - start))
+        if is_gym2_bool:
+            from gym2.vector_mjc_env import VectorMJCEnv
+
+            for par in [2, 4, 8, 16, 32, 64, 128, 256, 512]:
+                with closing(VectorMJCEnv(par, envclass)) as venv:
+                    start = time.time()
+                    for ac in acs.reshape(-1, par, *acs.shape[1:]):
+                        _, _, done, _ = venv.step(ac)
+                        if np.all(done):
+                            venv.reset()
+                    end = time.time()
+                print('   parallelized over {} envs {:.4g}'.format(
+                    par, end - start))
 
 
 def _main():

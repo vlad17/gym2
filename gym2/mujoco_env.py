@@ -41,8 +41,7 @@ class MujocoEnv(gym.Env):
 
         self.init_qpos = self.sim.data.qpos.ravel().copy()
         self.init_qvel = self.sim.data.qvel.ravel().copy()
-        observation, _, done, _ = self._step(np.zeros(self.model.nu))
-        assert not done
+        observation, _, _, _ = self._step(np.zeros(self.model.nu))
         self.obs_dim = observation.size
 
         bounds = self.model.actuator_ctrlrange.copy()
@@ -70,10 +69,14 @@ class MujocoEnv(gym.Env):
         """
         raise NotImplementedError
 
-    def _get_obs(self):
+    def get_obs(self, out_obs=None):
         """
         Provide an observation in the observation space given the current data,
-        available in self.sim.
+        available in self.sim, writing into the given output array.
+
+        If the output array is None, create a new array of an appropriate size.
+
+        In both cases return the destination array.
         """
         raise NotImplementedError
 
@@ -110,7 +113,7 @@ class MujocoEnv(gym.Env):
     def _step(self, ctrl):
         self.sim.data.ctrl[:] = ctrl
         self.sim.step()
-        obs = self._get_obs()
+        obs = self.get_obs()
         reward = self.sim.data.userdata[0]
         done = self.sim.data.userdata[1] > 0
         info = {}

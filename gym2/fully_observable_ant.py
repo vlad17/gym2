@@ -102,7 +102,7 @@ class FullyObservableAnt(MujocoEnv, FullyObservable):
     #         reward_contact=-contact_cost,
     #         reward_survive=survive_reward)
 
-    def tf_reward(self, state, action, next_state, reward):
+    def tf_reward(self, state, action, next_state):
         xposbefore = state[:, 0]
         xposafter = next_state[:, 0]
         trunc_cfrc_ext = tf.clip_by_value(next_state[:, -_CFRC_SIZE:], -1, 1)

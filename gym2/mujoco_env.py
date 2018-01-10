@@ -11,7 +11,9 @@ import numpy as np
 from os import path
 import gym
 import six
-import mujoco_py
+
+import cythonized
+from .mujoco.generated import const
 
 
 class MujocoEnv(gym.Env):
@@ -28,8 +30,8 @@ class MujocoEnv(gym.Env):
         if not path.exists(fullpath):
             raise IOError("File %s does not exist" % fullpath)
         self.frame_skip = frame_skip
-        self.model = mujoco_py.load_model_from_path(fullpath)
-        self.sim = mujoco_py.MjSim(
+        self.model = cythonized.load_model_from_path(fullpath)
+        self.sim = cythonized.MjSim(
             self.model, nsubsteps=self.frame_skip, **mjsim_kwargs)
         self.viewer = None
 
@@ -103,8 +105,8 @@ class MujocoEnv(gym.Env):
         assert qpos.shape == (
             self.model.nq,) and qvel.shape == (self.model.nv,)
         old_state = self.sim.get_state()
-        new_state = mujoco_py.MjSimState(old_state.time, qpos, qvel,
-                                         old_state.act, old_state.udd_state)
+        new_state = cythonized.MjSimState(old_state.time, qpos, qvel,
+                                          old_state.act, old_state.udd_state)
         self.sim.set_state(new_state)
         self.sim.forward()
 
@@ -143,5 +145,5 @@ class MujocoEnv(gym.Env):
             assert self.sim._render_context_offscreen is not None
             ctx = self.sim._render_context_offscreen
             ctx.cam.distance = self.model.stat.extent * 0.5
-            ctx.cam.type = mujoco_py.generated.const.CAMERA_TRACKING
+            ctx.cam.type = const.CAMERA_TRACKING
             ctx.cam.trackbodyid = 0

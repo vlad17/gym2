@@ -7,9 +7,9 @@ from string import Template
 
 import numpy as np
 import tensorflow as tf
-from mujoco_py.builder import build_callback_fn
 import six
 
+from .builder import build_callback_fn
 from .fully_observable import FullyObservable
 from .mujoco_env import MujocoEnv
 

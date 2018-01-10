@@ -2,7 +2,7 @@
 This class vectorizes mulitple mujoco environments across several CPUs.
 """
 
-from mujoco_py import MjSimPool
+from cythonized import MjSimPool
 import numpy as np
 
 from .vector_env import VectorEnv

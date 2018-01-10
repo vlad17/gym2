@@ -4,29 +4,26 @@ import time
 
 import gym
 import numpy as np
-import mujoco_py
 
 
 def _usage():
-    print('Usage: python tryit.py envname [render|bench]', file=sys.stderr)
+    print('Usage: python tryit.py envname {render,bench} {old,new}',
+          file=sys.stderr)
     sys.exit(1)
 
 
-def _mjpv():
-    if hasattr(mujoco_py, 'get_version'):
-        return mujoco_py.get_version()
-    return '0.5.7'  # yeah, just assume
+def _use_old_gym():
+    assert sys.argv[3] in ['old', 'new']
+    return sys.argv[3] == 'old'
 
 
 def _env(envname):
-    if _mjpv() == '0.5.7':
+    if _use_old_gym():
         envs = {
             'hc': lambda: gym.make('HalfCheetah-v1'),
             'ant': lambda: gym.make('Ant-v1')
         }
     else:
-        msg = 'you should be using vlad17/mujoco_py branch pre-post-callbacks'
-        assert _mjpv() == '1.50.1.99999', msg
         import gym2
         envs = {
             'hc': gym2.FullyObservableHalfCheetah,
@@ -37,12 +34,10 @@ def _env(envname):
     return envs[envname]
 
 
-def is_gym2():
-    if _mjpv() == '0.5.7':
-        print('mujoco_py version {}, using old gym'.format(_mjpv()))
-        return False
-    print('mujoco_py version {}, using gym2'.format(_mjpv()))
-    return True
+def print_is_gym2():
+    if _use_old_gym():
+        print('using old gym')
+    print('using gym2')
 
 
 def _random_actions(env, n):
@@ -60,8 +55,9 @@ def _random_actions(env, n):
 def _render(envname):
     horiz = 100
     envclass = _env(envname)
+    print_is_gym2()
     with closing(envclass()) as env:
-        if is_gym2():
+        if not _use_old_gym():
             env = gym.wrappers.TimeLimit(env, max_episode_steps=horiz)
         with closing(gym.wrappers.Monitor(
                 env, 'render', force=True)) as rendered:
@@ -83,9 +79,9 @@ def _bench(envname):
                 env.reset()
         end = time.time()
 
-        is_gym2_bool = is_gym2()
+        print_is_gym2()
         print('runtime for ~65K steps {:.4g}'.format(end - start))
-        if is_gym2_bool:
+        if not _use_old_gym():
             from gym2.vector_mjc_env import VectorMJCEnv
 
             for par in [2, 4, 8, 16, 32, 64, 128, 256, 512]:
@@ -101,10 +97,10 @@ def _bench(envname):
 
 
 def _main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         _usage()
 
-    envname, option = sys.argv[1:]
+    envname, option = sys.argv[1:3]
     should_render = {
         'render': True,
         'bench': False

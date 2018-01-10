@@ -204,7 +204,9 @@ This work is derived from the OpenAI gym package, which use the
 same license, copied below.
 
 Note that the source code was partially taken from a PR to the gym repository,
-https://github.com/openai/gym/pull/767.
+https://github.com/openai/gym/pull/767, and mujoco-py
+https://github.com/openai/mujoco-py at commit
+acc42a6bde0b514dc54b8976ffc408ec184e5f2a. Both have the same license.
 
 The MIT License
 

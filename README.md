@@ -4,4 +4,5 @@ A set of `gym` environments for continuous control based on MuJoCo 1.50.
 
 `python tryit.py hc render` -- render 100 timesteps of half cheetah
 
-Requires installing my fork of [mjc_py](https://github.com/vlad17/mujoco-py/tree/pre-post-callbacks)
+This is based off of a fork of both the `gym` and `mujoco-py` packages.
+See the LICENSE file for details.

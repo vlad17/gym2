@@ -30,8 +30,10 @@ class VectorMJCEnv(VectorEnv):
     def __init__(self, n, scalar_env_gen):
         assert n > 0, n
         self._envs = [scalar_env_gen() for _ in range(n)]
-        self._pool = MjSimPool([env.sim for env in self._envs])
-
+        frame_skips = set(env.frame_skip for env in self._envs)
+        assert len(frame_skips) == 1, frame_skips
+        self._pool = MjSimPool([env.sim for env in self._envs],
+                               nsubsteps=frame_skips.pop())
         env = self._envs[0]
         self.action_space = env.action_space
         self.observation_space = env.observation_space

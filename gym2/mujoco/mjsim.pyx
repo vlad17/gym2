@@ -62,16 +62,12 @@ cdef class MjSim(object):
     cdef readonly dict extras
     # Function pointer for substep callback, stored as uintptr
     cdef readonly uintptr_t substep_callback_ptr
-    # Analogous pointers before/after step execution
-    cdef readonly uintptr_t prestep_callback_ptr
-    cdef readonly uintptr_t poststep_callback_ptr
     # Callback executed before rendering.
     cdef public object render_callback
 
     def __cinit__(self, PyMjModel model, PyMjData data=None, int nsubsteps=1,
                   udd_callback=None, substep_callback=None, userdata_names=None,
-                  render_callback=None, prestep_callback_ptr=None,
-                  poststep_callback_ptr=None):
+                  render_callback=None):
         self.nsubsteps = nsubsteps
         self.model = model
         if data is None:
@@ -91,8 +87,6 @@ cdef class MjSim(object):
         self.render_callback = render_callback
         self.extras = {}
         self.set_substep_callback(substep_callback, userdata_names)
-        self.prestep_callback_ptr = prestep_callback_ptr or 0
-        self.poststep_callback_ptr = poststep_callback_ptr or 0
 
     def reset(self):
         """
@@ -123,11 +117,9 @@ cdef class MjSim(object):
             self.step_udd()
 
         with wrap_mujoco_warning():
-            self.prestep_callback()
             for _ in range(self.nsubsteps):
                 self.substep_callback()
                 mj_step(self.model.ptr, self.data.ptr)
-            self.poststep_callback()
 
     def render(self, width=None, height=None, *, camera_name=None, depth=False,
                mode='offscreen', device_id=-1):
@@ -193,14 +185,6 @@ cdef class MjSim(object):
         self._udd_callback = value
         self.udd_state = None
         self.step_udd()
-
-    cpdef prestep_callback(self):
-        if self.prestep_callback_ptr:
-            ( < mjfGeneric > self.prestep_callback_ptr)(self.model.ptr, self.data.ptr)
-
-    cpdef poststep_callback(self):
-        if self.poststep_callback_ptr:
-            ( < mjfGeneric > self.poststep_callback_ptr)(self.model.ptr, self.data.ptr)
 
     cpdef substep_callback(self):
         if self.substep_callback_ptr:

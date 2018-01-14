@@ -21,9 +21,10 @@ def _use_old_gym():
 
 def _env(envname):
     if _use_old_gym():
+        from gym2 import analogues
         envs = {
-            'hc': partial(gym.make, 'HalfCheetah-v1'),
-            'ant': partial(gym.make, 'Ant-v1')
+            'hc': analogues.GymFullyObservableHalfCheetah,
+            'ant': analogues.GymFullyObservableAnt
         }
     else:
         import gym2

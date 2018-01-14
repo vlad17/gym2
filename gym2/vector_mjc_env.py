@@ -62,16 +62,15 @@ class VectorMJCEnv(VectorEnv):
         assert m <= len(self._envs), (m, len(self._envs))
         obs = np.empty((m,) + self.observation_space.shape)
         rews = np.empty((m,))
-        dones = np.empty((m,), dtype=bool)
+        dones = np.empty((m,), dtype=np.uint8)
         infos = [{}] * m
         for env, ac in zip(self._envs, action):
             env.sim.data.ctrl[:] = ac
         self._pool.step()
         for i, env in enumerate(self._envs[:m]):
-            env.get_obs(obs[i])
-            rews[i] = env.sim.data.userdata[0]
-            dones[i] = env.sim.data.userdata[1] > 0
-        return obs, rews, dones, infos
+            dones[i] = env._get_obs(obs[i], rews[i:i+1], dones[i:i+1],
+                                    env._model_ptr, env._data_ptr)
+        return obs, rews, dones.astype(bool), infos
 
     def _close(self):
         for env in self._envs:

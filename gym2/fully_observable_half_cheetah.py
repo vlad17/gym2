@@ -18,6 +18,7 @@ import numpy as np
 import tensorflow as tf
 
 from .builder import build_callback_fn
+import cythonized
 from .fully_observable import FullyObservable
 from .mujoco_env import MujocoEnv
 
@@ -62,6 +63,7 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
         super().__init__('half_cheetah.xml', _FRAMESKIP,
                          prestep_callback_ptr=_PRESTEP_CALLBACK_FN,
                          poststep_callback_ptr=_POSTSTEP_CALLBACK_FN)
+        self._get_obs = cythonized.fully_observable_half_cheetah_get_obs
 
     # gym code
     # def _step(self, action):
@@ -96,13 +98,6 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
         vel_size = self.sim.data.qvel.size
         return (pos_size + vel_size,)
 
-    def get_obs(self, out_obs):
-        # difference from gym: added x position to observations
-        pos_size = self.sim.data.qpos.size
-        out_obs[:pos_size] = self.sim.data.qpos
-        out_obs[pos_size:] = self.sim.data.qvel
-        return out_obs
-
     # gym code
     # def reset_model(self):
     #     qpos = self.init_qpos + self.np_random.uniform(low=-.1, high=.1,
@@ -113,11 +108,13 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
 
     def reset_model(self):
         qpos = self.init_qpos + \
-            self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
-        qvel = self.init_qvel + self.np_random.randn(self.model.nv) * .1
+            self.np_random.uniform(low=-.1, high=.1, size=self.sim.model.nq)
+        qvel = self.init_qvel + self.np_random.randn(self.sim.model.nv) * .1
         self.set_state(qpos, qvel)
         obs = np.empty(self._obs_shape())
-        self.get_obs(obs)
+        _rew = np.empty((1,))
+        _done = np.empty((1,), dtype=np.uint8)
+        self._get_obs(obs, _rew, _done, self._model_ptr, self._data_ptr)
         return obs
 
     def set_state_from_ob(self, ob):

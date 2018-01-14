@@ -10,3 +10,5 @@ include "mujoco/mjrendercontext.pyx"
 include "mujoco/mjbatchrenderer.pyx"
 include "mujoco/gl_interface.pyx"
 include "mujoco/mjmisc.pyx"
+
+include "cy_fully_observable_half_cheetah.pyx"

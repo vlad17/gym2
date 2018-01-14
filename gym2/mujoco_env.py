@@ -30,9 +30,11 @@ class MujocoEnv(gym.Env):
         if not path.exists(fullpath):
             raise IOError("File %s does not exist" % fullpath)
         self.frame_skip = frame_skip
-        self.model = cythonized.load_model_from_path(fullpath)
+        model = cythonized.load_model_from_path(fullpath)
         self.sim = cythonized.MjSim(
-            self.model, nsubsteps=self.frame_skip, **mjsim_kwargs)
+           model, nsubsteps=self.frame_skip, **mjsim_kwargs)
+        self._model_ptr = cythonized.mj_model_ptr(self.sim.model)
+        self._data_ptr = cythonized.mj_data_ptr(self.sim.data)
         self.viewer = None
 
         self.metadata = {
@@ -44,7 +46,7 @@ class MujocoEnv(gym.Env):
         self.init_qvel = self.sim.data.qvel.ravel().copy()
         self.obs_shape = self._obs_shape()
 
-        bounds = self.model.actuator_ctrlrange.copy()
+        bounds = self.sim.model.actuator_ctrlrange.copy()
         low = bounds[:, 0]
         high = bounds[:, 1]
         self.action_space = spaces.Box(low, high)
@@ -77,10 +79,14 @@ class MujocoEnv(gym.Env):
         """
         raise NotImplementedError
 
-    def get_obs(self, out_obs):
+    def _get_obs(self, out_obs, out_rew):
         """
         Provide an observation in the observation space given the current data,
         available in self.sim, writing into the given output array.
+
+        Same follows for the output reward array, a size-1 array of a float.
+
+        Return a boolean whether done.
         """
         raise NotImplementedError
 
@@ -103,7 +109,7 @@ class MujocoEnv(gym.Env):
 
     def set_state(self, qpos, qvel):
         assert qpos.shape == (
-            self.model.nq,) and qvel.shape == (self.model.nv,)
+            self.sim.model.nq,) and qvel.shape == (self.sim.model.nv,)
         old_state = self.sim.get_state()
         new_state = cythonized.MjSimState(old_state.time, qpos, qvel,
                                           old_state.act, old_state.udd_state)
@@ -112,17 +118,18 @@ class MujocoEnv(gym.Env):
 
     @property
     def dt(self):
-        return self.model.opt.timestep * self.frame_skip
+        return self.sim.model.opt.timestep * self.frame_skip
 
     def _step(self, ctrl):
         self.sim.data.ctrl[:] = ctrl
         self.sim.step()
         obs = np.empty(self.obs_shape)
-        self.get_obs(obs)
-        reward = self.sim.data.userdata[0]
-        done = self.sim.data.userdata[1] > 0
+        reward = np.empty((1,))
+        done = np.empty((1,), dtype=np.uint8)
+        self._get_obs(
+            obs, reward, done, self._model_ptr, self._data_ptr)
         info = {}
-        return obs, reward, done, info
+        return obs, reward[0], done[0], info
 
     def _render(self, mode='human', close=False):
         if close:
@@ -144,6 +151,6 @@ class MujocoEnv(gym.Env):
             self.sim.render(640, 480)
             assert self.sim._render_context_offscreen is not None
             ctx = self.sim._render_context_offscreen
-            ctx.cam.distance = self.model.stat.extent * 0.5
+            ctx.cam.distance = self.sim.model.stat.extent * 0.5
             ctx.cam.type = const.CAMERA_TRACKING
             ctx.cam.trackbodyid = 0

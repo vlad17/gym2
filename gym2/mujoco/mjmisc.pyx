@@ -124,11 +124,3 @@ def load_model_from_mjb(bytes mjb_bytes):
     if model == NULL:
         raise Exception('%s\nFailed to load MJB')
     return WrapMjModel(model)
-
-def mj_model_ptr(py_mj_model):
-    cdef PyMjModel x = py_mj_model
-    return <uintptr_t>x.ptr
-
-def mj_data_ptr(py_mj_data):
-    cdef PyMjData x = py_mj_data
-    return <uintptr_t>x.ptr

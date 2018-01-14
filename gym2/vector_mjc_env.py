@@ -32,9 +32,16 @@ class VectorMJCEnv(VectorEnv):
         self._envs = [scalar_env_gen() for _ in range(n)]
         frame_skips = set(env.frame_skip for env in self._envs)
         assert len(frame_skips) == 1, frame_skips
-        self._pool = MjSimPool([env.sim for env in self._envs],
-                               nsubsteps=frame_skips.pop())
         env = self._envs[0]
+
+        obs_copy_fns = [env.c_get_obs_fn() for env in self._envs]
+        prestep_callbacks = [env.c_prestep_callback_fn() for env in self._envs]
+        poststep_callbacks = [env.c_poststep_callback_fn() for env in self._envs]
+        self._pool = MjSimPool([env.sim for env in self._envs],
+                               frame_skips.pop(),
+                               obs_copy_fns,
+                               prestep_callbacks,
+                               poststep_callbacks)
         self.action_space = env.action_space
         self.observation_space = env.observation_space
         self.reward_range = env.reward_range
@@ -64,12 +71,8 @@ class VectorMJCEnv(VectorEnv):
         rews = np.empty((m,))
         dones = np.empty((m,), dtype=np.uint8)
         infos = [{}] * m
-        for env, ac in zip(self._envs, action):
-            env.sim.data.ctrl[:] = ac
-        self._pool.step()
-        for i, env in enumerate(self._envs[:m]):
-            dones[i] = env._get_obs(obs[i], rews[i:i+1], dones[i:i+1],
-                                    env._model_ptr, env._data_ptr)
+        acs = np.asarray(action)
+        self._pool.step(acs, obs, rews, dones)
         return obs, rews, dones.astype(bool), infos
 
     def _close(self):

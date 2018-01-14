@@ -1,12 +1,23 @@
-cdef void callback_step(mjModel * model, mjData * data, int nsubsteps,
-                        uintptr_t prestep_callback,
-                        uintptr_t poststep_callback) nogil:
+
+ctypedef void (*ObsCopyFn)(double[:], double*, np.uint8_t*, mjModel*, mjData*) nogil
+ctypedef void (*PrestepCallback)(mjModel*, mjData*, double[:]) nogil
+ctypedef void (*PoststepCallback)(mjModel*, mjData*) nogil
+
+cdef inline void mjstep_with_callbacks(
+    mjModel* model, mjData* data, int nsubsteps,
+    uintptr_t observation_fn, uintptr_t prestep_callback,
+    uintptr_t poststep_callback, double[:] actions,
+    double* reward, np.uint8_t* done, double[:] out_obs) nogil:
+    cdef int j
+
     if prestep_callback:
-        ( < mjfGeneric > prestep_callback)(model, data)
-    for _ in range(nsubsteps):
+        (<PrestepCallback> prestep_callback)(model, data, actions)
+    for j in range(nsubsteps):
         mj_step(model, data)
     if poststep_callback:
-        ( < mjfGeneric > poststep_callback)(model, data)
+        (<PoststepCallback> poststep_callback)(model, data)
+    if observation_fn:
+        (<ObsCopyFn> observation_fn)(out_obs, reward, done, model, data)
 
 cdef class MjSimPool(object):
     """
@@ -22,23 +33,28 @@ cdef class MjSimPool(object):
         simulators' ``nsubstep`` will be ignored.
     """
     # Arrays of pointers to mjDatas and mjModels for fast multithreaded access
-    cdef mjModel ** _models
-    cdef mjData ** _datas
-    # Array of function pointers for pre and post step processing
-    cdef uintptr_t * _prestep_callbacks
-    cdef uintptr_t * _poststep_callbacks
+    cdef mjModel** _models
+    cdef mjData** _datas
     # Number of frames per step
     cdef int nsubsteps
+    # Array of function pointers for mujoco env pre and post step processing
+    cdef uintptr_t* _observation_copy_fns # ObsCopyFn
+    cdef uintptr_t* _prestep_callbacks # PrestepCallback
+    cdef uintptr_t* _poststep_callbacks # PoststepCallback
 
     """
     The :class:`.MjSim` objects that are part of the pool.
     """
     cdef readonly list sims
 
-    def __cinit__(self, list sims, int nsubsteps=1):
+    def __cinit__(self, list sims, int nsubsteps=1,
+                  list observation_copy_fns=None,
+                  list prestep_callbacks=None,
+                  list poststep_callbacks=None):
         self.sims = sims
         self.nsubsteps = nsubsteps
-        self._allocate_data_pointers()
+        self._allocate_data_pointers(
+            observation_copy_fns, prestep_callbacks, poststep_callbacks)
 
     def reset(self, nsims=None):
         """
@@ -74,7 +90,10 @@ cdef class MjSimPool(object):
                 for i in prange(length, schedule='guided'):
                     mj_forward(self._models[i], self._datas[i])
 
-    def step(self, nsims=None, np.ndarray mask=None):
+    def step(self,
+             np.ndarray actions,
+             np.ndarray out_obs, np.ndarray out_reward, np.ndarray out_done,
+             nsims=None, np.ndarray mask=None,):
         """
         Calls ``mj_step`` on all simulations in parallel, with ``nsubsteps`` as
         specified when the pool was created.
@@ -86,7 +105,13 @@ cdef class MjSimPool(object):
         """
         cdef int i, j
         cdef int length = self.nsims
-        cdef np.ndarray[np.uint8_t, cast = True] cmask = mask
+        cdef np.ndarray[np.uint8_t, cast = True] cmask_np = mask
+        cdef np.uint8_t[:] cmask = cmask_np
+        cdef double[:, :] cactions = actions
+        cdef double[:, :] cobs = out_obs
+        cdef double[:] creward = out_reward
+        cdef np.ndarray[np.uint8_t, cast = True] cdone_np = out_done
+        cdef np.uint8_t[:] cdone = cdone_np
 
         if nsims is not None:
             if nsims > self.nsims:
@@ -103,9 +128,12 @@ cdef class MjSimPool(object):
         with wrap_mujoco_warning():
             with nogil, parallel():
                 for i in prange(length, schedule='guided'):
-                    # TODO if cmask
-                    callback_step(self._models[i], self._datas[i], self.nsubsteps,
-                                  self._prestep_callbacks[i], self._poststep_callbacks[i])
+                    mjstep_with_callbacks(
+                        self._models[i], self._datas[i], self.nsubsteps,
+                        self._observation_copy_fns[i],
+                        self._prestep_callbacks[i],
+                        self._poststep_callbacks[i],
+                        cactions[i], &creward[i], &cdone[i], cobs[i])
 
     @property
     def nsims(self):
@@ -131,20 +159,23 @@ cdef class MjSimPool(object):
                 for _ in range(nsims)]
         return MjSimPool(sims, nsubsteps=sim.nsubsteps)
 
-    cdef _allocate_data_pointers(self):
+    cdef _allocate_data_pointers(self, obs, pre, post):
         self._models = <mjModel**>malloc(self.nsims * sizeof(mjModel *))
         self._datas = <mjData**>malloc(self.nsims * sizeof(mjData *))
+        self._observation_copy_fns = <uintptr_t * >malloc(self.nsims * sizeof(uintptr_t))
         self._prestep_callbacks = <uintptr_t * >malloc(self.nsims * sizeof(uintptr_t))
         self._poststep_callbacks = <uintptr_t * >malloc(self.nsims * sizeof(uintptr_t))
         for i in range(self.nsims):
             sim = <MjSim > self.sims[i]
             self._models[i] = sim.model.ptr
             self._datas[i] = sim.data.ptr
-            self._prestep_callbacks[i] = sim.prestep_callback_ptr
-            self._poststep_callbacks[i] = sim.poststep_callback_ptr
+            self._observation_copy_fns[i] = obs[i] if obs else 0
+            self._prestep_callbacks[i] = pre[i] if pre else 0
+            self._poststep_callbacks[i] = post[i] if post else 0
 
     def __dealloc__(self):
         free(self._datas)
         free(self._models)
         free(self._prestep_callbacks)
         free(self._poststep_callbacks)
+        free(self._observation_copy_fns)

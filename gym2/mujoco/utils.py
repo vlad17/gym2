@@ -1,4 +1,5 @@
 import copy
+from os import getenv
 from os.path import join, expanduser
 
 import numpy as np
@@ -46,12 +47,14 @@ def rec_copy(node):
 def discover_mujoco():
     """
     Discovers where MuJoCo is located in the file system.
-    Currently assumes path is in ~/.mujoco
+    Currently assumes path is in ~/.mujoco if MUJOCO_DIRECTORY is not
+    specified.
 
     Returns:
     - mjpro_path (str): Path to MuJoCo Pro 1.50 directory.
     - key_path (str): Path to the MuJoCo license key.
     """
-    key_path = join(expanduser('~'), '.mujoco', 'mjkey.txt')
-    mjpro_path = join(expanduser('~'), '.mujoco', 'mjpro150')
+    mjdir = getenv('MUJOCO_DIRECTORY', join(expanduser('~'), '.mujoco'))
+    key_path = join(mjdir, 'mjkey.txt')
+    mjpro_path = join(mjdir, 'mjpro150')
     return (mjpro_path, key_path)

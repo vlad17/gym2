@@ -5,17 +5,18 @@ the performance-critical sections of the half cheetah environment.
 This file should be read as part of fully_observable_half_cheetah.py
 """
 
-# TODO bounds checks, misc
-
-# return value is whether done
 # fohc = fully observable half cheetah
+# userdata[0] - reward
+# userdata[1] - done
 
 # gym code
 # def _get_obs(self):
 #     return np.concatenate([
 #         self.model.data.qpos.flat[1:],
 #         self.model.data.qvel.flat,
-#     ])a
+#     ])
+
+# note the difference from gym, we include the x position
 cdef void cython_fohc_get_obs(
         double[:] out_obs,
         double* out_reward,

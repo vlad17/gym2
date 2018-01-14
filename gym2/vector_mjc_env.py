@@ -1,5 +1,5 @@
 """
-This class vectorizes mulitple mujoco environments across several CPUs.
+This class vectorizes mulitple gym2 mujoco environments across several CPUs.
 """
 
 from cythonized import MjSimPool
@@ -46,10 +46,8 @@ class VectorMJCEnv(VectorEnv):
         self.observation_space = env.observation_space
         self.reward_range = env.reward_range
         self.n = len(self._envs)
+        self._mask = np.ones(self.n, dtype=bool)
         self._seed_uncorr(self.n)
-
-        for env in self._envs:
-            env.sim.data.ctrl[:] = 0
 
     def set_state_from_ob(self, obs):
         for ob, env in zip(obs, self._envs):
@@ -62,6 +60,7 @@ class VectorMJCEnv(VectorEnv):
         return seeds
 
     def _reset(self):
+        self._mask[:] = 1
         return np.asarray([env.reset() for env in self._envs])
 
     def _step(self, action):
@@ -72,9 +71,21 @@ class VectorMJCEnv(VectorEnv):
         dones = np.empty((m,), dtype=np.uint8)
         infos = [{}] * m
         acs = np.asarray(action)
-        self._pool.step(acs, obs, rews, dones)
-        return obs, rews, dones.astype(bool), infos
+        mask_char = self._mask.astype(np.uint8, copy=False)
+        self._pool.step(acs, obs, rews, dones,
+                        nsims=m, mask=mask_char)
+        return obs, rews, dones.astype(bool, copy=False), infos
 
     def _close(self):
         for env in self._envs:
             env.close()
+
+    def multi_step(self, acs_hna):
+        h, m = acs_hna.shape[:2]
+        assert m <= self.n, (m, self.n)
+        obs = np.empty((h, m,) + self.observation_space.shape)
+        rews = np.empty((h, m,))
+        dones = np.empty((h, m,), dtype=bool)
+        for i in range(h):
+            obs[i], rews[i], dones[i], _ = self.step(acs_hna[i])
+        return obs, rews, dones

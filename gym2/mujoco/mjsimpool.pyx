@@ -1,4 +1,3 @@
-
 ctypedef void (*ObsCopyFn)(double[:], double*, np.uint8_t*, mjModel*, mjData*) nogil
 ctypedef void (*PrestepCallback)(mjModel*, mjData*, double[:]) nogil
 ctypedef void (*PoststepCallback)(mjModel*, mjData*) nogil
@@ -92,8 +91,11 @@ cdef class MjSimPool(object):
 
     def step(self,
              np.ndarray actions,
-             np.ndarray out_obs, np.ndarray out_reward, np.ndarray out_done,
-             nsims=None, np.ndarray mask=None,):
+             np.ndarray out_obs,
+             np.ndarray out_reward,
+             np.ndarray out_done,
+             nsims=None,
+             np.ndarray mask=None):
         """
         Calls ``mj_step`` on all simulations in parallel, with ``nsubsteps`` as
         specified when the pool was created.
@@ -101,17 +103,17 @@ cdef class MjSimPool(object):
         If :attr:`.nsims` is specified, than only the first :attr:`.nsims` simulator are stepped.
 
         If the mask is specified, then it is used to only evaluate step() on those environments
-        for which the mask is True
+        for which the mask is True.
+
+        If the mask is specified, then it is also updated according to the done results.
         """
         cdef int i, j
         cdef int length = self.nsims
-        cdef np.ndarray[np.uint8_t, cast = True] cmask_np = mask
-        cdef np.uint8_t[:] cmask = cmask_np
+        cdef np.uint8_t[:] cmask = mask
         cdef double[:, :] cactions = actions
         cdef double[:, :] cobs = out_obs
         cdef double[:] creward = out_reward
-        cdef np.ndarray[np.uint8_t, cast = True] cdone_np = out_done
-        cdef np.uint8_t[:] cdone = cdone_np
+        cdef np.uint8_t[:] cdone = out_done
 
         if nsims is not None:
             if nsims > self.nsims:
@@ -128,12 +130,15 @@ cdef class MjSimPool(object):
         with wrap_mujoco_warning():
             with nogil, parallel():
                 for i in prange(length, schedule='guided'):
-                    mjstep_with_callbacks(
-                        self._models[i], self._datas[i], self.nsubsteps,
-                        self._observation_copy_fns[i],
-                        self._prestep_callbacks[i],
-                        self._poststep_callbacks[i],
-                        cactions[i], &creward[i], &cdone[i], cobs[i])
+                    if i < length and (cmask is None or cmask[i]):
+                        mjstep_with_callbacks(
+                            self._models[i], self._datas[i], self.nsubsteps,
+                            self._observation_copy_fns[i],
+                            self._prestep_callbacks[i],
+                            self._poststep_callbacks[i],
+                            cactions[i], &creward[i], &cdone[i], cobs[i])
+                        if cdone[i] and cmask is not None:
+                            cmask[i] = 0
 
     @property
     def nsims(self):

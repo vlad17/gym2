@@ -12,11 +12,9 @@ This file contains a fully-observable analogue of the HalfCheetah gym
 environment. Note that part of this file's
 """
 
-from string import Template
-
 import tensorflow as tf
 
-import cythonized
+from . import cythonized
 from .fully_observable import FullyObservable
 from .mujoco_env import MujocoEnv
 

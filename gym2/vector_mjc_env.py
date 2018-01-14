@@ -2,9 +2,9 @@
 This class vectorizes mulitple gym2 mujoco environments across several CPUs.
 """
 
-from cythonized import MjSimPool
 import numpy as np
 
+from .cythonized import MjSimPool
 from .vector_env import VectorEnv
 
 
@@ -54,10 +54,9 @@ class VectorMJCEnv(VectorEnv):
             env.set_state_from_ob(ob)
 
     def _seed(self, seed=None):
-        seeds = []
         for env, env_seed in zip(self._envs, seed):
-            seeds.append(env.seed(env_seed))
-        return seeds
+            env.seed(env_seed)
+        return seed
 
     def _reset(self):
         self._mask[:] = 1

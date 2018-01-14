@@ -1,10 +1,12 @@
 from contextlib import closing
+from functools import partial
 import sys
 import time
 
 import gym
 import numpy as np
 
+gym.undo_logger_setup()
 
 def _usage():
     print('Usage: python tryit.py envname {render,bench} {old,new}',
@@ -20,8 +22,8 @@ def _use_old_gym():
 def _env(envname):
     if _use_old_gym():
         envs = {
-            'hc': lambda: gym.make('HalfCheetah-v1'),
-            'ant': lambda: gym.make('Ant-v1')
+            'hc': partial(gym.make, 'HalfCheetah-v1'),
+            'ant': partial(gym.make, 'Ant-v1')
         }
     else:
         import gym2
@@ -37,7 +39,8 @@ def _env(envname):
 def print_is_gym2():
     if _use_old_gym():
         print('using old gym')
-    print('using gym2')
+    else:
+        print('using gym2')
 
 
 def _random_actions(env, n):
@@ -81,19 +84,23 @@ def _bench(envname):
 
         print_is_gym2()
         print('runtime for ~65K steps {:.4g}'.format(end - start))
-        if not _use_old_gym():
-            from gym2.vector_mjc_env import VectorMJCEnv
-
-            for par in [2, 4, 8, 16, 32, 64, 128, 256, 512]:
-                with closing(VectorMJCEnv(par, envclass)) as venv:
-                    start = time.time()
-                    for ac in acs.reshape(-1, par, *acs.shape[1:]):
-                        _, _, done, _ = venv.step(ac)
-                        if np.all(done):
-                            venv.reset()
-                    end = time.time()
-                print('   parallelized over {} envs {:.4g}'.format(
-                    par, end - start))
+        if _use_old_gym():
+            from gym2 import ParallelGymVenv
+            par_env = ParallelGymVenv
+        else:
+            from gym2 import VectorMJCEnv
+            par_env = VectorMJCEnv
+        for par in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]:
+            with closing(par_env(par, envclass)) as venv:
+                venv.reset()
+                start = time.time()
+                for ac in acs.reshape(-1, par, *acs.shape[1:]):
+                    _, _, done, _ = venv.step(ac)
+                    if np.all(done):
+                        venv.reset()
+                end = time.time()
+            print('   parallelized over {} envs {:.4g}'.format(
+                par, end - start))
 
 
 def _main():

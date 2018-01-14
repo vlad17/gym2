@@ -3,12 +3,9 @@ This file was made in the style of fully_observable_half_cheetah.py,
 mimicking the analogous gym environment.
 """
 
-from string import Template
-
-import numpy as np
 import tensorflow as tf
 
-import cythonized
+from . import cythonized
 from .fully_observable import FullyObservable
 from .mujoco_env import MujocoEnv
 

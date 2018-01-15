@@ -19,7 +19,7 @@ from cffi import FFI
 from Cython.Build import cythonize
 from Cython.Distutils.old_build_ext import old_build_ext as build_ext
 
-from .mujoco.utils import discover_mujoco
+from gym2.mujoco.utils import discover_mujoco
 
 
 def get_nvidia_version():

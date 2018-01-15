@@ -91,7 +91,10 @@ def _bench(envname):
         else:
             from gym2 import VectorMJCEnv
             par_env = VectorMJCEnv
-        for par in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]:
+        import multiprocessing as mp
+        cpu = mp.cpu_count()
+        warmup = True
+        for par in [cpu, 1, 2, 4, cpu, 512]:
             with closing(par_env(par, envclass)) as venv:
                 venv.reset()
                 start = time.time()
@@ -100,8 +103,11 @@ def _bench(envname):
                     if np.all(done):
                         venv.reset()
                 end = time.time()
-            print('   parallelized over {} envs {:.4g}'.format(
-                par, end - start))
+            if warmup:
+                warmup = False
+            else:
+                print('   parallelized over {} envs {:.4g}'.format(
+                    par, end - start))
 
 
 def _main():

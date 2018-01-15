@@ -51,7 +51,13 @@ setup(
     license='Apache 2.0',
     packages=packages,
     package_dir={'gym2': 'gym2'},
-    package_data={'gym2': ['mujoco/generated/*.so']},
+    # hacky, should be built once when packaging
+    # this builds on every install
+    package_data={'gym2': ['mujoco/generated/*.so',
+                           '*.pyx', 'mujoco/*.pyx',
+                           'mujoco/pxd/*.pyx', 'mujoco/pxd/*.pxd',
+                           'mujoco/gl/*.h', 'mujoco/gl/*.c',
+                           'mujoco/generated/*.pxi']},
     install_requires=read_requirements_file('requirements.txt'),
     tests_require=read_requirements_file('requirements.dev.txt'),
     # Add requirements for builder.py here since there's no

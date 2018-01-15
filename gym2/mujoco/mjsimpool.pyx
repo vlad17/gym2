@@ -40,6 +40,8 @@ cdef class MjSimPool(object):
     cdef uintptr_t* _observation_copy_fns # ObsCopyFn
     cdef uintptr_t* _prestep_callbacks # PrestepCallback
     cdef uintptr_t* _poststep_callbacks # PoststepCallback
+    # Maximum number of threads to use
+    cdef int _max_threads
 
     """
     The :class:`.MjSim` objects that are part of the pool.
@@ -49,11 +51,13 @@ cdef class MjSimPool(object):
     def __cinit__(self, list sims, int nsubsteps=1,
                   list observation_copy_fns=None,
                   list prestep_callbacks=None,
-                  list poststep_callbacks=None):
+                  list poststep_callbacks=None,
+                  int max_threads=1):
         self.sims = sims
         self.nsubsteps = nsubsteps
         self._allocate_data_pointers(
             observation_copy_fns, prestep_callbacks, poststep_callbacks)
+        self._max_threads = max_threads
 
     def reset(self, nsims=None):
         """
@@ -85,7 +89,7 @@ cdef class MjSimPool(object):
 
         # See explanation in MjSimPool.step() for why we wrap warnings this way
         with wrap_mujoco_warning():
-            with nogil, parallel():
+            with nogil, parallel(num_threads=self._num_threads(length)):
                 for i in prange(length, schedule='guided'):
                     mj_forward(self._models[i], self._datas[i])
 
@@ -128,7 +132,7 @@ cdef class MjSimPool(object):
         # Because we expect to have fatal warnings, we'll just wrap the entire
         # section, and if any call ends up setting an exception we'll raise.
         with wrap_mujoco_warning():
-            with nogil, parallel():
+            with nogil, parallel(num_threads=self._num_threads(length)):
                 for i in prange(length, schedule='guided'):
                     if i < length and (cmask is None or cmask[i]):
                         mjstep_with_callbacks(
@@ -146,6 +150,14 @@ cdef class MjSimPool(object):
         Number of simulations in the pool.
         """
         return len(self.sims)
+
+    cdef int _num_threads(self, int n) nogil:
+        cdef int num_threads = self._max_threads
+        if n < self._max_threads:
+            num_threads = n
+        if num_threads <= 0:
+            num_threads = 1
+        return num_threads
 
     @staticmethod
     def create_from_sim(sim, nsims):

@@ -2,6 +2,8 @@
 This class vectorizes mulitple gym2 mujoco environments across several CPUs.
 """
 
+import multiprocessing as mp
+
 import numpy as np
 
 from .cythonized import MjSimPool
@@ -27,7 +29,7 @@ class VectorMJCEnv(VectorEnv):
     are active.
     """
 
-    def __init__(self, n, scalar_env_gen):
+    def __init__(self, n, scalar_env_gen, max_threads=None):
         assert n > 0, n
         self._envs = [scalar_env_gen() for _ in range(n)]
         frame_skips = set(env.frame_skip for env in self._envs)
@@ -36,12 +38,18 @@ class VectorMJCEnv(VectorEnv):
 
         obs_copy_fns = [env.c_get_obs_fn() for env in self._envs]
         prestep_callbacks = [env.c_prestep_callback_fn() for env in self._envs]
-        poststep_callbacks = [env.c_poststep_callback_fn() for env in self._envs]
+        poststep_callbacks = [env.c_poststep_callback_fn()
+                              for env in self._envs]
+        # https://stackoverflow.com/questions/14267555
+        # round up to power of 2
+        max_threads = max_threads or max(
+            1 << (mp.cpu_count() - 1).bit_length(), 1)
         self._pool = MjSimPool([env.sim for env in self._envs],
                                frame_skips.pop(),
                                obs_copy_fns,
                                prestep_callbacks,
-                               poststep_callbacks)
+                               poststep_callbacks,
+                               max_threads=max_threads)
         self.action_space = env.action_space
         self.observation_space = env.observation_space
         self.reward_range = env.reward_range

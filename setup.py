@@ -54,7 +54,7 @@ setup(
     package_data={'gym2': ['mujoco/generated/*.so']},
     install_requires=read_requirements_file('requirements.txt'),
     tests_require=read_requirements_file('requirements.dev.txt'),
-    # Add requirements for mujoco_py/builder.py here since there's no
+    # Add requirements for builder.py here since there's no
     # guarantee that they've been installed before this setup script
     # is run. (The install requirements only guarantee that those packages
     # are installed as part of installation. No promises about order.)

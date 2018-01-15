@@ -8,6 +8,7 @@ import numpy as np
 
 gym.undo_logger_setup()
 
+
 def _usage():
     print('Usage: python tryit.py envname {render,bench} {old,new}',
           file=sys.stderr)
@@ -93,21 +94,21 @@ def _bench(envname):
             par_env = VectorMJCEnv
         import multiprocessing as mp
         cpu = mp.cpu_count()
-        warmup = True
-        for par in [cpu, 1, 2, 4, cpu, 512]:
+        # https://stackoverflow.com/questions/14267555
+        # round up to power of 2
+        cpu = 1 << (cpu - 1).bit_length()
+        for par in [1, 2, 4, cpu, 512]:
             with closing(par_env(par, envclass)) as venv:
                 venv.reset()
+                venv.step(acs[:par])  # warmup
                 start = time.time()
                 for ac in acs.reshape(-1, par, *acs.shape[1:]):
                     _, _, done, _ = venv.step(ac)
                     if np.all(done):
                         venv.reset()
                 end = time.time()
-            if warmup:
-                warmup = False
-            else:
-                print('   parallelized over {} envs {:.4g}'.format(
-                    par, end - start))
+            print('   parallelized over {} envs {:.4g}'.format(
+                par, end - start))
 
 
 def _main():

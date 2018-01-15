@@ -57,7 +57,7 @@ setup(
                            '*.pyx', 'mujoco/*.pyx',
                            'mujoco/pxd/*.pyx', 'mujoco/pxd/*.pxd',
                            'mujoco/gl/*.h', 'mujoco/gl/*.c',
-                           'mujoco/generated/*.pxi']},
+                           'mujoco/generated/*.pxi', 'assets/*.xml']},
     install_requires=read_requirements_file('requirements.txt'),
     tests_require=read_requirements_file('requirements.dev.txt'),
     # Add requirements for builder.py here since there's no

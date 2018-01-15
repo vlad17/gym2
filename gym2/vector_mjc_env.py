@@ -71,7 +71,7 @@ class VectorMJCEnv(VectorEnv):
         infos = [{}] * m
         acs = np.asarray(action)
         mask_char = self._mask.astype(np.uint8, copy=False)
-        self._pool.step(acs, obs, rews, dones,
+        self._pool.step(np.asarray(acs, dtype=float), obs, rews, dones,
                         nsims=m, mask=mask_char)
         return obs, rews, dones.astype(bool, copy=False), infos
 

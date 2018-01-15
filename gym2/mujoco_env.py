@@ -167,7 +167,7 @@ class MujocoEnv(gym.Env):
         return self.sim.model.opt.timestep * self.frame_skip
 
     def _step(self, ctrl):
-        self.prestep_callback(ctrl)
+        self.prestep_callback(np.asarray(ctrl, dtype=float))
         self.sim.step()
         self.poststep_callback()
         obs, reward, done = self.get_obs()

@@ -1,6 +1,7 @@
 ctypedef void (*ObsCopyFn)(double[:], double*, np.uint8_t*, mjModel*, mjData*) nogil
 ctypedef void (*PrestepCallback)(mjModel*, mjData*, double[:]) nogil
 ctypedef void (*PoststepCallback)(mjModel*, mjData*) nogil
+ctypedef void (*SetStateFn)(mjModel*, mjData*, double[:]) nogil
 
 cdef inline void mjstep_with_callbacks(
     mjModel* model, mjData* data, int nsubsteps,
@@ -40,6 +41,7 @@ cdef class MjSimPool(object):
     cdef uintptr_t* _observation_copy_fns # ObsCopyFn
     cdef uintptr_t* _prestep_callbacks # PrestepCallback
     cdef uintptr_t* _poststep_callbacks # PoststepCallback
+    cdef uintptr_t* _set_state_fns # SetStateFn
     # Maximum number of threads to use
     cdef int _max_threads
 
@@ -52,11 +54,12 @@ cdef class MjSimPool(object):
                   list observation_copy_fns=None,
                   list prestep_callbacks=None,
                   list poststep_callbacks=None,
+                  list set_state_fns=None,
                   int max_threads=1):
         self.sims = sims
         self.nsubsteps = nsubsteps
         self._allocate_data_pointers(
-            observation_copy_fns, prestep_callbacks, poststep_callbacks)
+            observation_copy_fns, prestep_callbacks, poststep_callbacks, set_state_fns)
         self._max_threads = max_threads
 
     def reset(self, nsims=None):
@@ -92,6 +95,29 @@ cdef class MjSimPool(object):
             with nogil, parallel(num_threads=self._num_threads(length)):
                 for i in prange(length, schedule='guided'):
                     mj_forward(self._models[i], self._datas[i])
+
+    def set_state_from_ob(self, np.ndarray obs, nsims=None):
+        """
+        Equivalent to set_state_from_ob on the individual environments
+        """
+        cdef int i
+        cdef int length = self.nsims
+        cdef double[:, :] cobs = obs
+
+        if nsims is not None:
+            if nsims > self.nsims:
+                raise ValueError("nsims is larger than pool size")
+            length = nsims
+
+        # See explanation in MjSimPool.step() for why we wrap warnings this way
+        with wrap_mujoco_warning():
+            with nogil, parallel(num_threads=self._num_threads(length)):
+                for i in prange(length, schedule='guided'):
+                    if self._set_state_fns[i]:
+                        (<SetStateFn> self._set_state_fns[i])(
+                            self._models[i], self._datas[i], cobs[i])
+                    mj_forward(self._models[i], self._datas[i])
+
 
     def step(self,
              np.ndarray actions,
@@ -176,12 +202,13 @@ cdef class MjSimPool(object):
                 for _ in range(nsims)]
         return MjSimPool(sims, nsubsteps=sim.nsubsteps)
 
-    cdef _allocate_data_pointers(self, obs, pre, post):
+    cdef _allocate_data_pointers(self, obs, pre, post, set_state):
         self._models = <mjModel**>malloc(self.nsims * sizeof(mjModel *))
         self._datas = <mjData**>malloc(self.nsims * sizeof(mjData *))
-        self._observation_copy_fns = <uintptr_t * >malloc(self.nsims * sizeof(uintptr_t))
-        self._prestep_callbacks = <uintptr_t * >malloc(self.nsims * sizeof(uintptr_t))
-        self._poststep_callbacks = <uintptr_t * >malloc(self.nsims * sizeof(uintptr_t))
+        self._observation_copy_fns = <uintptr_t* >malloc(self.nsims * sizeof(uintptr_t))
+        self._prestep_callbacks = <uintptr_t* >malloc(self.nsims * sizeof(uintptr_t))
+        self._poststep_callbacks = <uintptr_t* >malloc(self.nsims * sizeof(uintptr_t))
+        self._set_state_fns = <uintptr_t* >malloc(self.nsims * sizeof(uintptr_t))
         for i in range(self.nsims):
             sim = <MjSim > self.sims[i]
             self._models[i] = sim.model.ptr
@@ -189,6 +216,7 @@ cdef class MjSimPool(object):
             self._observation_copy_fns[i] = obs[i] if obs else 0
             self._prestep_callbacks[i] = pre[i] if pre else 0
             self._poststep_callbacks[i] = post[i] if post else 0
+            self._set_state_fns[i] = set_state[i] if set_state else 0
 
     def __dealloc__(self):
         free(self._datas)

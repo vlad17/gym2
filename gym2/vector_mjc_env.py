@@ -40,6 +40,7 @@ class VectorMJCEnv(VectorEnv):
         prestep_callbacks = [env.c_prestep_callback_fn() for env in self._envs]
         poststep_callbacks = [env.c_poststep_callback_fn()
                               for env in self._envs]
+        set_state_fns = [env.c_set_state_fn() for env in self._envs]
         # https://stackoverflow.com/questions/14267555
         # round up to power of 2
         max_threads = max_threads or max(
@@ -49,6 +50,7 @@ class VectorMJCEnv(VectorEnv):
                                obs_copy_fns,
                                prestep_callbacks,
                                poststep_callbacks,
+                               set_state_fns,
                                max_threads=max_threads)
         self.action_space = env.action_space
         self.observation_space = env.observation_space
@@ -58,8 +60,8 @@ class VectorMJCEnv(VectorEnv):
         self._seed_uncorr(self.n)
 
     def set_state_from_ob(self, obs):
-        for ob, env in zip(obs, self._envs):
-            env.set_state_from_ob(ob)
+        obs_float = np.asarray(obs, dtype=float)
+        self._pool.set_state_from_ob(obs_float, nsims=len(obs))
 
     def _seed(self, seed=None):
         for env, env_seed in zip(self._envs, seed):

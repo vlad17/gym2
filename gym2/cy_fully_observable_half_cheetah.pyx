@@ -99,3 +99,20 @@ def python_fohc_c_poststep_fn():
 
 def python_fohc_frameskip():
     return FOHC_FRAMESKIP
+
+cdef void cython_fohc_set_state(mjModel* model, mjData* data, double[:] obs) nogil:
+    cdef int i
+    for i in range(model.nq):
+        data.qpos[i] = obs[i]
+    for i in range(model.nv):
+        data.qvel[i] = obs[i + model.nq]
+
+def python_fohc_set_state(sim, np.ndarray obs):
+    cdef PyMjData data = sim.data
+    cdef PyMjModel model = sim.model
+    cdef double[:] cobs = obs
+    cython_fohc_set_state(model.ptr, data.ptr, obs)
+    
+
+def python_fohc_c_set_state_fn():
+    return <uintptr_t>&cython_fohc_set_state

@@ -13,6 +13,7 @@ environment. Note that part of this file's
 """
 
 import tensorflow as tf
+import numpy as np
 
 from . import cythonized
 from .fully_observable import FullyObservable
@@ -62,16 +63,13 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
         qpos = self.init_qpos + \
             self.np_random.uniform(low=-.1, high=.1, size=self.sim.model.nq)
         qvel = self.init_qvel + self.np_random.randn(self.sim.model.nv) * .1
-        self.set_state(qpos, qvel)
+        self.set_state(np.concatenate([qpos, qvel]))
         obs, _, _ = self.get_obs()
         return obs
 
     def set_state_from_ob(self, ob):
-        self.reset()
-        split = self.init_qpos.size
-        qpos = ob[:split].reshape(self.init_qpos.shape)
-        qvel = ob[split:].reshape(self.init_qvel.shape)
-        self.set_state(qpos, qvel)
+        self.set_state(ob)
+        self.sim.forward()
 
     # implemented in cython in cy_fully_observable_half_cheetah.pyx
 
@@ -95,3 +93,9 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
 
     def c_poststep_callback_fn(self):
         return cythonized.python_fohc_c_poststep_fn()
+
+    def set_state(self, obs):
+        return cythonized.python_fohc_set_state(self.sim, obs)
+
+    def c_set_state_fn(self):
+        return cythonized.python_fohc_c_set_state_fn()

@@ -136,31 +136,31 @@ class MujocoEnv(gym.Env):
         """
         raise NotImplementedError
 
-    def viewer_setup(self):
+    def c_set_state_fn(self):
         """
-        This method is called when the viewer is initialized and after every reset
-        Optionally implement this method, if you need to tinker with camera position
-        and so forth.
+        Return a pointer to a function as an int with type:
+
+        void set_state(mjModel* model, mjData* data, double[:] newstate) nogil
+
+        where the above sets the state of the environment.
         """
-        pass
+        raise NotImplementedError
+
+    def set_state(self, obs):
+        """
+        Equivalent to the C function above.
+        
+        set_state_from_ob() should be equivalent to invoking this
+        function and then calling self.sim.forward()
+        """
+        raise NotImplementedError
 
     # -----------------------------
 
     def _reset(self):
         self.sim.reset()
         ob = self.reset_model()
-        if self.viewer is not None:
-            self.viewer_setup()
         return ob
-
-    def set_state(self, qpos, qvel):
-        assert qpos.shape == (
-            self.sim.model.nq,) and qvel.shape == (self.sim.model.nv,)
-        old_state = self.sim.get_state()
-        new_state = cythonized.MjSimState(old_state.time, qpos, qvel,
-                                          old_state.act, old_state.udd_state)
-        self.sim.set_state(new_state)
-        self.sim.forward()
 
     @property
     def dt(self):

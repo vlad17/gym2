@@ -99,7 +99,7 @@ def _bench(envname):
         cpu = 1 << (cpu - 1).bit_length()
         for par in [1, 2, 4, cpu, 512]:
             with closing(par_env(par, envclass)) as venv:
-                venv.reset()
+                obs = venv.reset()
                 venv.step(acs[:par])  # warmup
                 start = time.time()
                 for ac in acs.reshape(-1, par, *acs.shape[1:]):
@@ -107,8 +107,16 @@ def _bench(envname):
                     if np.all(done):
                         venv.reset()
                 end = time.time()
-            print('   parallelized over {} envs {:.4g}'.format(
-                par, end - start))
+                steptime = end - start
+
+                start = time.time()
+                for _ in range(len(acs) // par):
+                    venv.set_state_from_ob(obs)
+                end = time.time()
+
+            print('   parallelized over {} envs {:.4g}'
+                  '  (set_state_from_ob {:.4g})'.format(
+                      par, steptime, end - start))
 
 
 def _main():

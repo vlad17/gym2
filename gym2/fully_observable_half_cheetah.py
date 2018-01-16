@@ -63,12 +63,12 @@ class FullyObservableHalfCheetah(MujocoEnv, FullyObservable):
         qpos = self.init_qpos + \
             self.np_random.uniform(low=-.1, high=.1, size=self.sim.model.nq)
         qvel = self.init_qvel + self.np_random.randn(self.sim.model.nv) * .1
-        self.set_state(np.concatenate([qpos, qvel]))
+        self.set_state_from_ob(np.concatenate([qpos, qvel]))
         obs, _, _ = self.get_obs()
         return obs
 
     def set_state_from_ob(self, ob):
-        self.set_state(ob)
+        self.set_state(np.asarray(ob, dtype=float))
         self.sim.forward()
 
     # implemented in cython in cy_fully_observable_half_cheetah.pyx

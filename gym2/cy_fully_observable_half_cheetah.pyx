@@ -107,11 +107,11 @@ cdef void cython_fohc_set_state(mjModel* model, mjData* data, double[:] obs) nog
     for i in range(model.nv):
         data.qvel[i] = obs[i + model.nq]
 
-def python_fohc_set_state(sim, np.ndarray obs):
+def python_fohc_set_state(sim, obs):
     cdef PyMjData data = sim.data
     cdef PyMjModel model = sim.model
     cdef double[:] cobs = obs
-    cython_fohc_set_state(model.ptr, data.ptr, obs)
+    cython_fohc_set_state(model.ptr, data.ptr, cobs)
     
 
 def python_fohc_c_set_state_fn():

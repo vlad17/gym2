@@ -3,6 +3,7 @@ This class vectorizes mulitple gym2 mujoco environments across several CPUs.
 """
 
 import multiprocessing as mp
+import os
 
 import numpy as np
 
@@ -27,6 +28,11 @@ class VectorMJCEnv(VectorEnv):
     For more information, see VectorEnv. It contains more information
     on what happens when some of the environments are done while others
     are active.
+
+    Maximum parallelism is chosen as follows, in this order:
+    * argument max_threads
+    * env variable OMP_NUM_THREADS
+    * number of CPUs on current machine, rounded up to nearest power of 2
     """
 
     def __init__(self, n, scalar_env_gen, max_threads=None):
@@ -41,10 +47,10 @@ class VectorMJCEnv(VectorEnv):
         poststep_callbacks = [env.c_poststep_callback_fn()
                               for env in self._envs]
         set_state_fns = [env.c_set_state_fn() for env in self._envs]
+        max_threads = max_threads or int(os.getenv('OMP_NUM_THREADS', '0'))
         # https://stackoverflow.com/questions/14267555
-        # round up to power of 2
-        max_threads = max_threads or max(
-            1 << (mp.cpu_count() - 1).bit_length(), 1)
+        max_threads = max_threads or (1 << (mp.cpu_count() - 1).bit_length())
+        max_threads = max(max_threads, 1)
         self._pool = MjSimPool([env.sim for env in self._envs],
                                frame_skips.pop(),
                                obs_copy_fns,

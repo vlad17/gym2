@@ -52,9 +52,9 @@ class MujocoEnv(gym.Env):
         low = -high
         self.observation_space = spaces.Box(low, high)
 
-        self._seed()
+        self.seed()
 
-    def _seed(self, seed=None):
+    def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
@@ -157,7 +157,7 @@ class MujocoEnv(gym.Env):
 
     # -----------------------------
 
-    def _reset(self):
+    def reset(self):
         self.sim.reset()
         ob = self.reset_model()
         return ob
@@ -166,7 +166,7 @@ class MujocoEnv(gym.Env):
     def dt(self):
         return self.sim.model.opt.timestep * self.frame_skip
 
-    def _step(self, ctrl):
+    def step(self, ctrl):
         self.prestep_callback(np.asarray(ctrl, dtype=float))
         self.sim.step()
         self.poststep_callback()
@@ -174,7 +174,7 @@ class MujocoEnv(gym.Env):
         info = {}
         return obs, reward, done, info
 
-    def _render(self, mode='human', close=False):
+    def render(self, mode='human', close=False):
         if close:
             if self.viewer is not None:
                 self.viewer = None

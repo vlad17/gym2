@@ -69,16 +69,16 @@ class VectorMJCEnv(VectorEnv):
         obs_float = np.asarray(obs, dtype=float)
         self._pool.set_state_from_ob(obs_float, nsims=len(obs))
 
-    def _seed(self, seed=None):
+    def seed(self, seed=None):
         for env, env_seed in zip(self._envs, seed):
             env.seed(env_seed)
         return seed
 
-    def _reset(self):
+    def reset(self):
         self._mask[:] = 1
         return np.asarray([env.reset() for env in self._envs])
 
-    def _step(self, action):
+    def step(self, action):
         m = len(action)
         assert m <= len(self._envs), (m, len(self._envs))
         obs = np.empty((m,) + self.observation_space.shape)
@@ -91,7 +91,7 @@ class VectorMJCEnv(VectorEnv):
                         nsims=m, mask=mask_char)
         return obs, rews, dones.astype(bool, copy=False), infos
 
-    def _close(self):
+    def close(self):
         for env in self._envs:
             env.close()
 
